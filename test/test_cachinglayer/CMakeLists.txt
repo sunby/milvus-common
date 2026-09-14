@@ -27,21 +27,29 @@ add_executable(cachinglayer_test
     ${CACHINGLAYER_TEST_FILES}
 )
 
-target_link_libraries(cachinglayer_test
-    GTest::gtest
-    GTest::gmock
-    milvus-common
-    ${COMMON_LINKER_LIBS}
-    Threads::Threads
+# The metrics mode is fixed for the process lifetime, so aggregate tests use a
+# separate executable with explicit startup configuration.
+add_executable(cachinglayer_aggregate_metrics_test
+    aggregate_metrics_main.cpp
+    test_cache_slot.cpp
+    test_cache_shard_metrics.cpp
 )
-if(NOT APPLE)
-    target_link_libraries(cachinglayer_test atomic gomp)
-endif()
+
+foreach(test_target cachinglayer_test cachinglayer_aggregate_metrics_test)
+    target_link_libraries(${test_target} PRIVATE
+        GTest::gtest
+        GTest::gmock
+        milvus-common
+        ${COMMON_LINKER_LIBS}
+        Threads::Threads
+    )
+    if(NOT APPLE)
+        target_link_libraries(${test_target} PRIVATE atomic gomp)
+    endif()
+endforeach()
 
 add_test(NAME cachinglayer_test COMMAND cachinglayer_test)
-add_test(NAME cachinglayer_aggregate_metrics_test COMMAND cachinglayer_test
+add_test(NAME cachinglayer_aggregate_metrics_test COMMAND cachinglayer_aggregate_metrics_test
     --gtest_filter=CacheShardDiskUsageMetricTest.*:CacheSlotShardDiskUsageTest.*)
-set_tests_properties(cachinglayer_aggregate_metrics_test PROPERTIES
-    ENVIRONMENT "MCL_TEST_AGGREGATE_SHARD_METRICS=1")
 
-install(TARGETS cachinglayer_test DESTINATION unittest)
+install(TARGETS cachinglayer_test cachinglayer_aggregate_metrics_test DESTINATION unittest)
